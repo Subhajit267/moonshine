@@ -59,9 +59,11 @@ Features:
 - JSON phoneme event streaming
 
 Revisions:
-- 2026-06-07  Initial streaming daemon implementation
-              with PipeWire audio output and phoneme
+- 2026-06-04  Initial streaming daemon implementation
+- 2026-06-06  Added PipeWire audio output and phoneme
               streaming support
+- 2026-06-07  Increased audio length duration to 
+              roughly 20secs
 ------------------------------------------------------------
 */
 #include <algorithm>
