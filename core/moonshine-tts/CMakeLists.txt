@@ -1,9 +1,18 @@
-# Moonshine TTS / G2P (ONNX). Lived at github.com/moonshine-ai/moonshine-tts; integrated under core/moonshine-tts.
-# Third-party: core/third-party/{utf8proc,nlohmann,doctest,onnxruntime}.
+# ------------------------------------------------------------
+# Moonshine TTS / G2P (ONNX)
+# Originally from github.com/moonshine-ai/moonshine-tts;
+# integrated under core/moonshine-tts.
+# Third-party: core/third-party/{utf8proc,nlohmann,doctest,onnxruntime}
+# Modifications for streaming TTS daemon (2026-06):
+#   - Added moonshine_tts_stream executable.
+#   - Optional PipeWire support for low‑latency audio output.
+# ------------------------------------------------------------
 
 set(_MOONSHINE_TTS_ROOT "${CMAKE_CURRENT_LIST_DIR}")
 set(_MOONSHINE_CORE_ROOT "${_MOONSHINE_TTS_ROOT}/..")
 set(MOONSHINE_MONOREPO_ROOT "${_MOONSHINE_CORE_ROOT}/..")
+
+# ================= UTF‑8 PROCESSING LIBRARY =================
 
 add_library(moonshine_tts_utf8proc STATIC
   ${_MOONSHINE_CORE_ROOT}/third-party/utf8proc/utf8proc.c
@@ -19,6 +28,8 @@ target_compile_definitions(moonshine_tts_utf8proc PRIVATE UTF8PROC_EXPORTS PUBLI
 set_target_properties(moonshine_tts_utf8proc PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 enable_testing()
+
+# ================= CORE TTS / G2P LIBRARY (no ONNX) =================
 
 add_library(moonshine_tts_core STATIC
   src/file-information.cpp
@@ -73,6 +84,8 @@ if(MSVC)
   target_compile_options(moonshine_tts_core PRIVATE /utf-8)
 endif()
 
+# ================= RULE‑BASED G2P TOOLS (no ONNX) =================
+
 add_executable(piper_ipa_normalize_cli tools/piper-ipa-normalize-cli.cpp)
 target_link_libraries(piper_ipa_normalize_cli PRIVATE moonshine_tts_core)
 
@@ -102,6 +115,8 @@ target_link_libraries(dutch_g2p_batch PRIVATE moonshine_tts_core)
 
 add_executable(french_g2p_batch tools/french-g2p-batch-cli.cpp)
 target_link_libraries(french_g2p_batch PRIVATE moonshine_tts_core)
+
+# ================= TEST FRAMEWORK =================
 
 set(MOONSHINE_TTS_DOCTEST_INC "${_MOONSHINE_CORE_ROOT}/third-party/doctest")
 
@@ -139,11 +154,14 @@ moonshine_tts_add_test(cmudict_tsv_test moonshine_tts_core)
 moonshine_tts_add_test(json_config_test moonshine_tts_core)
 moonshine_tts_add_test(english_hand_oov_test moonshine_tts_core)
 
+# ================= ONNX RUNTIME TARGETS (OPTIONAL) =================
+
 option(MOONSHINE_TTS_BUILD_ONNX "Build moonshine-tts ONNX Runtime targets" ON)
 
 if(MOONSHINE_TTS_BUILD_ONNX)
   include(${_MOONSHINE_TTS_ROOT}/cmake/moonshine-tts-onnxruntime.cmake)
 
+  # ----- ONNX‑dependent TTS library -----
   add_library(moonshine_tts_ort STATIC
     src/ort-onnx-external-data.cpp
     src/lang-specific/onnx-g2p-models.cpp
@@ -172,6 +190,7 @@ if(MOONSHINE_TTS_BUILD_ONNX)
   endif()
   moonshine_tts_link_onnxruntime(moonshine_tts_ort)
 
+  # ----- Batch TTS CLI (original) -----
   add_executable(moonshine_tts tools/moonshine-tts-cli.cpp)
   set_target_properties(moonshine_tts PROPERTIES OUTPUT_NAME "moonshine-tts")
   target_link_libraries(moonshine_tts PRIVATE moonshine_tts_ort)
@@ -180,6 +199,7 @@ if(MOONSHINE_TTS_BUILD_ONNX)
     copy_onnxruntime_dll(moonshine_tts)
   endif()
 
+  # ----- G2P CLI -----
   add_executable(moonshine_tts_g2p_cli tools/moonshine-g2p-cli.cpp)
   set_target_properties(moonshine_tts_g2p_cli PROPERTIES OUTPUT_NAME "moonshine-tts-g2p")
   target_link_libraries(moonshine_tts_g2p_cli PRIVATE moonshine_tts_ort)
@@ -215,6 +235,52 @@ if(MOONSHINE_TTS_BUILD_ONNX)
   if(WIN32)
     copy_onnxruntime_dll(arabic_rule_g2p)
   endif()
+
+  # ================= STREAMING TTS DAEMON =================
+  #
+  # Provides low‑latency, real‑time speech output via Unix domain
+  # sockets and PipeWire.  Uses the callback‑based streaming API
+  # added to MoonshineTTS.
+  add_executable(moonshine_tts_stream
+    tools/moonshine-tts-stream-cli.cpp
+  )
+  set_target_properties(moonshine_tts_stream PROPERTIES
+    OUTPUT_NAME "moonshine-tts-stream"
+  )
+  # Allow the daemon to find its own header (spsc_ringbuffer.h)
+  target_include_directories(moonshine_tts_stream PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/tools
+  )
+  target_link_libraries(moonshine_tts_stream PRIVATE moonshine_tts_ort)
+  moonshine_tts_set_ort_rpath(moonshine_tts_stream)
+  if(WIN32)
+    copy_onnxruntime_dll(moonshine_tts_stream)
+  endif()
+
+  # ----- Optional PipeWire support -----
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PIPEWIRE QUIET libpipewire-0.3)
+    if(PIPEWIRE_FOUND)
+      target_compile_definitions(moonshine_tts_stream PRIVATE
+        MOONSHINE_WITH_PIPEWIRE=1
+      )
+      # Mark PipeWire headers as SYSTEM to suppress pedantic warnings
+      target_include_directories(moonshine_tts_stream SYSTEM PRIVATE
+        ${PIPEWIRE_INCLUDE_DIRS}
+      )
+      target_link_libraries(moonshine_tts_stream PRIVATE
+        ${PIPEWIRE_LIBRARIES}
+      )
+      message(STATUS "moonshine-tts-stream: PipeWire audio output enabled")
+    else()
+      message(STATUS "moonshine-tts-stream: PipeWire NOT found — building without audio")
+    endif()
+  else()
+    message(STATUS "moonshine-tts-stream: PkgConfig not found — PipeWire detection skipped")
+  endif()
+
+  # ================= ONNX‑DEPENDENT TESTS =================
 
   moonshine_tts_add_test(onnx_g2p_smoke_test moonshine_tts_ort)
   moonshine_tts_set_ort_rpath(onnx_g2p_smoke_test)
@@ -264,6 +330,7 @@ if(MOONSHINE_TTS_BUILD_ONNX)
     copy_onnxruntime_dll(english_rule_g2p_test)
   endif()
 
+  # Tests that need the full ONNX engine with G2P class
   target_link_libraries(russian_rule_g2p_test PRIVATE moonshine_tts_ort)
   moonshine_tts_set_ort_rpath(russian_rule_g2p_test)
   if(WIN32)
