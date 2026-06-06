@@ -1,28 +1,3 @@
-**A) Style analysis of reference file (`pal_windows.c`)**
-- **Header block:** Multi‑line `/* ... */` with a row of dashes, fields aligned with a colon, and a revision list.
-- **Section separators:** `/* ================= SECTION NAME ================= */` in all caps, surrounded by blank lines.
-- **Inline comments:** Use `/* ... */` for multi‑sentence explanations; `//` for short remarks or disabled code. Comments are placed on their own line or at the end of a line after code.
-- **Function grouping:** Functions are collected under a section header; each function is separated by a blank line.
-- **Documentation:** No separate Doxygen style; purpose is conveyed by the section header and occasional brief comments before functions.
-- **Formatting:** `{` on the same line as function signature; consistent indentation; no trailing spaces; clean vertical spacing.
-
-**B) Change summary (original → modified `moonshine‑tts.cpp`)**
-
-1. **Streaming callback in `KokoroTtsEngine::synthesize`** – Added an optional `MoonshineTTS::ChunkCallback` parameter; if set, the callback is invoked after each ONNX chunk is extracted but before the chunk is appended to the final waveform. The original behaviour is preserved when no callback is given.
-
-2. **`MoonshineTTS::Impl` streaming methods** – Added `synthesize_streaming_unlocked` and `synthesize_streaming` that forward the callback to the engine (Kokoro) or, for Piper, synthesise the whole utterance and call the callback once with an empty phoneme string and the complete waveform.
-
-3. **Public `MoonshineTTS::synthesize_streaming`** – New public method that delegates to the implementation’s streaming variant, mirroring the existing batch synthesis API.
-
-4. **Word‑group chunking (`chunk_phonemes`)** – Extended the function with a `max_words` parameter (default 0 = original behaviour). When `max_words > 0`, the phoneme string is split into groups of at most `max_words` words, still respecting the 510‑codepoint safety limit. This allows the streaming pipeline to emit smaller, more frequent chunks, reducing latency for conversational use. The engine now calls `chunk_phonemes(phonemes, 510, 5)` to produce roughly 5‑word chunks.
-
-5. **No other logic changed** – All original synthesizer methods, helper functions, and effect processing remain intact.
-
-**C) Fully commented final source file (`moonshine‑tts.cpp`)**
-
-The following file integrates all the above modifications and adds comments in the style of the PAL reference file.
-
-```cpp
 /*
 ------------------------------------------------------------
 Author: Subhajit Halder (adaptation from Moonshine project)
