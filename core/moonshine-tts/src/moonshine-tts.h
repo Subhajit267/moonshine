@@ -1,7 +1,6 @@
 /*
 ------------------------------------------------------------
 Author: Subhajit Halder (adaptation from Moonshine project)
-Date Created: 2026-05-30
 Date Last Modified: 2026-06-07
 Module:      Moonshine TTS
 File:        moonshine-tts.h
