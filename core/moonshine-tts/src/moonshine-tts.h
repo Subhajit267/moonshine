@@ -1,11 +1,13 @@
 /*
 ------------------------------------------------------------
+Author: Subhajit Halder (adaptation from Moonshine project)
+Date Created: 2026-05-30
+Date Last Modified: 2026-06-07
 Module:      Moonshine TTS
 File:        moonshine-tts.h
 About:       Unified TTS public API (Kokoro & Piper backends).
              Provides batch synthesis and, as of 2026, a
              streaming callback interface for low‑latency use.
-Modified By: Subhajit Halder
 Revisions:
 - 2026-06    Added ChunkCallback and synthesize_streaming()
              for per‑phoneme‑chunk streaming.
