@@ -1550,4 +1550,3 @@ std::vector<MoonshineTtsVoiceAvailability> moonshine_list_tts_voices_with_availa
 }
 
 }  // namespace moonshine_tts
-```
