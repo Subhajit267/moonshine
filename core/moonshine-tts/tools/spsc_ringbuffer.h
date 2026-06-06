@@ -104,4 +104,3 @@ public:
         return w - r;
     }
 };
-```
