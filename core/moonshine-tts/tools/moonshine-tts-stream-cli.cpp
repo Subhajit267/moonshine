@@ -236,7 +236,6 @@ static bool write_all(int fd, const char* data, size_t len) {
 // ---------------------------------------------------------------------------
 static void signal_handler(int) {
     g_stop.store(true, std::memory_order_relaxed);
-    g_text_queue.close();
 #ifdef MOONSHINE_WITH_PIPEWIRE
     if (g_pw.loop) pw_main_loop_quit(g_pw.loop);
 #endif
@@ -469,7 +468,14 @@ static void synthesis_thread_func() {
                     }
 
                     // Push audio into lock‑free ring buffer.
-                    g_audio_ring.push(pcm_int16.data(), pcm_int16.size());
+                    size_t pushed = g_audio_ring.push(pcm_int16.data(), pcm_int16.size());
+                    if (pushed < pcm_int16.size()) {
+                        fprintf(stderr,
+                                "[synth] warning: ring buffer overflow "
+                                "(pushed %zu of %zu)\n",
+                                pushed,
+                                pcm_int16.size());
+                    }
 
                     // Push phoneme chunk for the IPC channel.
                     g_phoneme_queue.push({seq, phoneme_chunk});
