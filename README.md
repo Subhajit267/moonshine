@@ -1,6 +1,6 @@
-# 🚀 Moonshine Streaming TTS Extension
+# <div align="center">🚀 Moonshine Streaming TTS Extension </div>
 
-### Real-Time Streaming Text-to-Speech Daemon for Moonshine Voice
+### <div align="center">Real-Time Streaming Text-to-Speech Daemon for Moonshine Voice</div>
 
 <div align="center">
 
@@ -452,7 +452,7 @@ To support streaming, the API was extended.
 Added to:
 
 ```text
-core/moonshine-tts/include/moonshine-tts.h
+core/moonshine-tts/src/moonshine-tts.h
 ```
 
 Example:
@@ -511,7 +511,7 @@ Responsibilities:
 
 ## Modified Files
 
-### `core/moonshine-tts/include/moonshine-tts.h`
+### `core/moonshine-tts/src/moonshine-tts.h`
 
 Reason:
 
@@ -528,13 +528,13 @@ Added:
 
 Reason:
 
-Implement callback-driven synthesis.
+Implement callback-driven synthesis and low-latency word-group chunking.
 
 Added:
 
 * Streaming synthesis path
 * Callback dispatching
-* Chunk emission support
+* Word‑group chunking (5 words per chunk) to reduce first‑audio latency
 
 ---
 
@@ -655,22 +655,16 @@ Verified functionality:
 
 # ⚠️ Known Limitations
 
-The streaming infrastructure is fully operational.
+The streaming infrastructure is fully operational, including the word‑group chunking that splits phoneme sequences into smaller groups (default 5 words). This ensures that even moderate‑length sentences produce multiple callbacks, reducing first‑audio latency.
 
-However, the current Kokoro backend generally synthesizes short utterances as a single chunk.
+The current Kokoro backend can still produce single chunks for very short utterances (a few words). However, for longer text the word‑group chunking guarantees streaming behavior.
+
+The ring buffer capacity is set to 524288 samples (~21.8 seconds at 24 kHz), which comfortably accommodates typical utterance lengths. Truncation is thus extremely unlikely.
 
 Therefore:
 
-```text
-Streaming IPC         ✔
-Streaming Playback    ✔
-Streaming Audio       ✔
-
-Fine-Grained Chunking
-Limited by current Kokoro chunk strategy
-```
-
-This affects perceived first-audio latency for short utterances but does not affect correctness of the streaming architecture itself.
+* Streaming IPC, playback, and audio are all functional.
+* Latency is significantly improved by word‑group chunking; further reduction would require modifying the internal Kokoro model or ONNX graph.
 
 ---
 
@@ -679,7 +673,7 @@ This affects perceived first-audio latency for short utterances but does not aff
 Potential future enhancements:
 
 * Adaptive phoneme chunk sizing
-* Reduced first-audio latency
+* Reduced first-audio latency (e.g., sentence‑level splitting)
 * Multi-client support
 * Network transport
 * WebSocket interface
